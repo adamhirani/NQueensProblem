@@ -95,7 +95,7 @@ def format_solution():
 def calculate_most_collisions(board_size):
     global cols
 
-    max_collisions = 4
+    max_collisions = 1
     collisions = []
 
     for col in range(len(cols)):
