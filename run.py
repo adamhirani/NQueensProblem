@@ -11,7 +11,7 @@ from nqueens import solve
 if len(sys.argv) != 2:
     print("\n\tUsage: python3 run.py <test-file>\n")
     exit(1)
-
+    
 in_file = sys.argv[1]
 
 problems = []
@@ -21,4 +21,8 @@ with open(in_file) as f:
 
 for p in problems:
     print(solve(p))
+
+
+
+    
 
