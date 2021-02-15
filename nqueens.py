@@ -1,130 +1,233 @@
-import time
 import random
 
-# Implement a solver that returns a list of queen's locations
-#  - Make sure the list is the right length, and uses the numbers from 0 .. BOARD_SIZE-1
-    
-def solve(board_size):
-    data = {'size': board_size, 'rows': [], 'cols': [], 'diag1': [], 'diag2': []}
 
-    moved = False
+class Board:
+    def __init__(self, board_size):
+        """
+        Initializes a new board
 
-    while True:
-        if not moved:
-            setup(data)
-        
-        moved = False
-        most_collisions = calculate_most_collisions(data)
+        :param board_size: the size of the board
+        """
 
-        if len(most_collisions) == 0:
-            return format_solution(data)
+        self.size = board_size
+        self.cols = [-1] * board_size  # -1 represents a piece not on the board
 
-        for col in most_collisions:
-            row = optimize_column(data, col)
+        # Data structures for collision handling
+        self.rows = [0] * board_size
+        self.diag1s = [0] * (board_size * 2 - 1)
+        self.diag2s = [0] * (board_size * 2 - 1)
 
-            if row is None:
+        self.shuffle()
+
+    def calc_collisions(self, col, row=None):
+        """
+        Calculates the number of collisions at a given position
+
+        :param col: the column index
+        :param row: the row index (by default gets the current row of the queen at that column)
+        :return: the number of collisions at the position
+        """
+
+        if row is None:
+            row = self.cols[col]  # set row to column's queen's row
+
+        # Calculate diagonal indexes
+        diag1_index = self.calc_diag1(col, row)
+        diag2_index = self.calc_diag2(col, row)
+
+        # Sum number of collisions
+        total = self.rows[row] + self.diag1s[diag1_index] + \
+            self.diag2s[diag2_index]
+
+        return total
+
+    def calc_diag1(self, col, row):
+        """
+        Calculates the index of the top right to bottom left diagonal
+
+        :param col: the column index
+        :param row: the row index
+        :return: the diaginal index
+        """
+
+        return col + row
+
+    def calc_diag2(self, col, row):
+        """
+        Calculates the index of the bottom right to top left diagonal
+
+        :param col: the column index
+        :param row: the row index
+        :return: the diaginal index
+        """
+
+        return self.size - 1 - col + row
+
+    def move(self, col, new_row):
+        """
+        Moves a queen
+
+        :param col: the column index of the queen to move
+        :param new_row: the row index to move the queen to
+        """
+
+        # Get current row
+        row = self.cols[col]
+
+        # If moving to same position, don't
+        if new_row == row:
+            return
+
+        # Remove collision (don't if the queen is currently off the board)
+        if row != -1:
+            self.rows[row] -= 1
+            self.diag1s[self.calc_diag1(col, row)] -= 1
+            self.diag2s[self.calc_diag2(col, row)] -= 1
+
+        # Move the piece
+        self.cols[col] = new_row
+
+        # Add collision (don't if the queen is moving off the board)
+        if new_row != -1:
+            self.rows[new_row] += 1
+            self.diag1s[self.calc_diag1(col, new_row)] += 1
+            self.diag2s[self.calc_diag2(col, new_row)] += 1
+
+    def shuffle(self, amount=5):
+        """
+        Solves the board and then randomizes some queens
+
+        :param amount: the amount of queens to randomize
+        :return: a list of queens in conflict
+        """
+
+        # Move all pieces off the board
+        for i in range(len(self.cols)):
+            self.move(i, -1)
+
+        size = self.size
+
+        # If board size is odd
+        if size % 2 == 1:
+            # Place a queen at (n, n)
+            self.move(size - 1, size - 1)
+            size -= 1
+
+        # Implementation of Hoffman's algorithms
+        for i in range(1, size // 2 + 1):
+            if (size - 2) % 6 == 0:
+                self.move(1 + (2 * (i - 1) - 1 + size // 2) % size - 1, i - 1)
+                self.move(size - (2 * (i - 1) - 1 + size // 2) %
+                          size - 1, size + 1 - i - 1)
+            else:
+                self.move(2 * i - 1, i - 1)
+                self.move(2 * i - 2, size // 2 + i - 1)
+
+        # Randomize some queens and store them
+        collisions = []
+
+        for i in range(amount):
+            col = random.randint(0, self.size - 1)
+            row = random.randint(0, self.size - 1)
+
+            self.move(col, row)
+            collisions.append(col)
+
+        # Return the randomizes queens
+        return collisions
+
+    def optimize(self, col):
+        """
+        Optimizes a queen to have the minimum number of conflicts
+
+        :param col: the column index of the queen
+        :return: True if no more conflicts after optimizing
+        """
+
+        current_row = self.cols[col]
+        self.move(col, -1)  # Move piece off the board
+
+        # Keep track of collisions to find less than
+        min_collisions = self.calc_collisions(col, current_row)
+        new_row = current_row
+
+        # Try every row
+        for row in range(self.size):
+            if row == current_row:
                 continue
 
-            move(data, col, row)
-            moved = True
-            break
+            # Get number of collisions at that position
+            collisions = self.calc_collisions(col, row)
 
-def move(data, col, new_row):
-    row = data['cols'][col]
+            # If not less collisions than already found, ignore
+            if collisions >= min_collisions:
+                continue
 
-    if row == new_row:
-        return
+            # Save position
+            min_collisions = collisions
+            new_row = row
 
-    data['rows'][row] -= 1
-    data['diag1'][calculate_diag(col, row)] -= 1
-    data['diag2'][calculate_diag(col, row, data['size'])] -= 1
+        # Move the piece to the new row
+        self.move(col, new_row)
 
-    row = new_row
-    data['cols'][col] = row
-    data['rows'][row] += 1
-    data['diag1'][calculate_diag(col, row)] += 1
-    data['diag2'][calculate_diag(col, row, data['size'])] += 1
+        # Returns true if the new position has no conflicts
+        return min_collisions == 0
 
-def calculate_collisions(data, col, row=None):
-    total = -3
+    def format_solution(self):
+        """
+        Formats the board as 1s indexed
 
-    if row is None:
-        row = data['cols'][col]
-    else:
-        total += 3
-    
-    diag1_index = calculate_diag(col, row)
-    diag2_index = calculate_diag(col, row, data['size'])
+        :return: a list of queen positions
+        """
 
-    total += data['rows'][row] + data['diag1'][diag1_index] + data['diag2'][diag2_index]
+        return [i + 1 for i in self.cols]
 
-    return total
 
-def optimize_column(data, col):
-    current_row = data['cols'][col]
-    min_collisions = calculate_collisions(data, col)
-    result = None
+def solve(board_size):
+    """
+    Solves the n-queens problem using the min-conflicts algorithm and saves it to solutions.txt
 
-    for row in range(len(data['rows'])):
-        if row == current_row:
-            continue
+    :param board_size: the size of the board to solve
+    :return: a list of queen positions
+    """
 
-        collisions = calculate_collisions(data, col, row)
+    # Create a new board
+    board = Board(board_size)
 
-        if collisions >= min_collisions:
-            continue
+    # Max steps before giving up
+    max_steps = 20
 
-        min_collisions = collisions
-        result = row
+    while True:
+        # Get all collisions
+        collisions = board.shuffle()
 
-    return result
+        for i in range(max_steps):
+            # Check if no more collisions
+            if len(collisions) == 0:
+                # Formats, saves, and returns the solution
+                solution = board.format_solution()
+                save(solution)
+                return solution
 
-def format_solution(data):
-    return [i + 1 for i in data['cols']]
+            # If not on the last iteration
+            if i != max_steps - 1:
+                # Choose a randomly conflicted queen
+                var = random.choice(collisions)
 
-def calculate_most_collisions(data):
-    max_collisions = 1
-    collisions = []
+                # Optimize. Check if that queen now has no conflicts
+                if board.optimize(var):
+                    # If so, remove from the conflicts list
+                    collisions.remove(var)
 
-    for col in range(len(data['cols'])):
-        total_collisions = calculate_collisions(data, col)
 
-        if total_collisions < max_collisions:
-            continue
+def save(board, filename="solutions.txt"):
+    """
+    Saves a board to a file
 
-        if total_collisions == max_collisions:
-            collisions.append(col)
-        else:
-            collisions = [col]
-            max_collisions = total_collisions
-    
-    return collisions
+    :param board: the board to save
+    :param filename: the file to save the board to
+    """
 
-def setup(data):
-    n = data['size']
-
-    data['rows'] = [0] * n
-    data['cols'] = [0] * n
-    data['diag1'] = [0] * (n * 2 - 1)
-    data['diag2'] = [0] * (n * 2 - 1)
-
-    for col in range(n):
-        row = random.randint(0, n - 1)
-        data['rows'][row] += 1
-        data['cols'][col] = row
-        data['diag1'][calculate_diag(col, row, data['size'])] += 1
-        data['diag2'][calculate_diag(col, row, data['size'])] += 1
-
-def calculate_diag(col, row, size=None):
-    if size is None:
-        # diag 1
-        return col + row
-    else:
-        # diag 2
-        return size - 1 - col + row
-
-start_time = time.time()
-print(solve(1000))
-total_time = time.time() - start_time
-
-print("Took " + str(int(total_time // 60)) + "m " + str(total_time % 60) + "s to complete.")
+    file = open(filename, "a")
+    file.write(str(board) + "\n")
+    file.close()
